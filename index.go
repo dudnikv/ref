@@ -3,6 +3,7 @@
 package ref
 
 import (
+	"fmt"
 	"sort"
 )
 
@@ -22,13 +23,9 @@ type StatIndex interface {
 }
 
 type DynIndex interface {
-	FindOrIns(cmp func(Ref) int, ins func() Ref) Ref
+	FindOrIns(cmp func(Ref) int, ins func() Ref) (Ref, int)
 	FindAndDel(cmp func(Ref) int)
 }
-
-//type Page0016 [16]Ref
-//type Page0256 [256]Ref
-//type Page4096 [4096]Ref
 
 type Page interface {
 	[16]Ref | [256]Ref | [4096]Ref
@@ -51,4 +48,22 @@ func (p *PageIndex[P]) Find(cmp func(Ref) int) Ref {
 		return p.data[pos]
 	}
 	return RefNul
+}
+
+func (p *PageIndex[P]) FindOrIns(cmp func(Ref) int, ins func() Ref) (Ref, int) {
+	pos, ok := sort.Find(p.len, func(i int) int { return cmp(p.data[i]) })
+	if ok {
+		return p.data[pos], 0
+	}
+	if p.len == len(p.data) {
+		panic(fmt.Errorf("Page[%d] overflow", p.len))
+	}
+	ref := ins()
+	for i := p.len; i < pos; i-- {
+		p.data[i] = p.data[i-1]
+	}
+	//	copy(p.data[pos+1:p.len+1],p.data[pos:p.len])
+	p.data[pos] = ref
+	p.len++
+	return ref, 1
 }
